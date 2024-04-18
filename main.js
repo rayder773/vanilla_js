@@ -1,315 +1,223 @@
-class Element {
-  constructor() {
-    this._id = "";
-    this._className = "";
-  }
-
-  setId(id) {
-    this._id = id;
-
-    return this;
-  }
-
-  setClassName(className) {
-    this._className = className;
-
-    return this;
-  }
-}
-
-class InputElement extends Element {
-  constructor() {
-    super();
-    this._type = "text";
-    this._value = "";
-    this._disabled = false;
-    this._name = "";
-  }
-
-  setType(type) {
-    this._type = type;
-
-    return this;
-  }
-
-  setValue(value) {
-    this._value = value;
-
-    return this;
-  }
-
-  setDisabled(disabled) {
-    this._disabled = disabled;
-
-    return this;
-  }
-
-  setName(name) {
-    this._name = name;
-
-    return this;
-  }
-
-  get html() {
-    return `<input type="${this._type}" id="${this._id}" value="${
-      this._value
-    }" name="${this._name}" ${this._disabled ? "disabled" : ""}>`;
-  }
-}
-
-class ButtonElement extends Element {
-  constructor() {
-    super();
-    this._type = "button";
-    this._value = "";
-    this._disabled = false;
-  }
-
-  setType(type) {
-    this._type = type;
-
-    return this;
-  }
-
-  setValue(value) {
-    this._value = value;
-
-    return this;
-  }
-
-  setDisabled(disabled) {
-    this._disabled = disabled;
-
-    return this;
-  }
-
-  get html() {
-    return `<button 
-      ${this._id ? `id="${this._id}"` : ""}
-      type="${this._type}" 
-      ${this._disabled ? "disabled" : ""}
-    >
-      ${this._value}
-    </button>`;
-  }
-}
-
-class FormElement extends Element {
-  constructor() {
-    super();
-    this.usernameInput = new InputElement();
-    this.usernameInput.setType("text").setName("username");
-    this.passwordInputElement = new InputElement();
-    this.passwordInputElement.setType("password").setName("password");
-    this.submitButton = new ButtonElement();
-    this.submitButton.setType("submit").setValue("Login");
-  }
-
-  get html() {
-    return `<form id="${this._id}" class="${this._className}">
-      ${this.usernameInput.html}
-      ${this.passwordInputElement.html}
-      ${this.submitButton.html}
-    </form>`;
-  }
-}
-
-class LoginPage {
-  constructor() {
-    this.formElement = new FormElement();
-    this.removeButton = new ButtonElement();
-    this.removeButton.setValue("Remove");
-  }
-
-  get html() {
-    return `${this.formElement.html}${this.removeButton.html}`;
-  }
-}
-
-class App {
-  constructor() {
-    this.loginPage = new LoginPage();
-  }
-
-  render() {
-    document.body.innerHTML = this.loginPage.html;
-  }
-}
-
-const app = new App();
-
-const ids = {
-  formId: "login-form",
-  usernameInputId: "username-input",
-  removeButtonId: "remove-button",
-};
-
-const classNames = {
-  formClassName: "login-form-class",
-};
-
-app.loginPage.formElement.setId(ids.formId);
-app.loginPage.formElement.usernameInput.setId(ids.usernameInputId);
-app.loginPage.formElement.setClassName(classNames.formClassName);
-app.loginPage.removeButton.setId(ids.removeButtonId);
-
-app.render();
-
-class Controller {
-  _id = "";
-  _events = {};
+class Component {
+  _eventListeners = {};
   _children = [];
 
-  getElement() {
-    return document.getElementById(this._id);
+  get html() {
+    return "";
   }
 
-  addEventListener(event, callback) {
-    this.getElement().addEventListener(event, callback);
+  on(event, callback) {
+    if (!this._eventListeners[event]) {
+      this._eventListeners[event] = [];
+    }
 
-    return this;
+    this._eventListeners[event].push(callback);
   }
 
-  removeEventListener(event, callback) {
-    this.getElement().removeEventListener(event, callback);
+  start() {
+    this._children.forEach((child) => child.start());
+  }
 
-    return this;
+  stop() {
+    this._children.forEach((child) => child.stop());
   }
 
   addChild(child) {
     this._children.push(child);
 
-    return this;
+    return child.html;
   }
+}
 
-  setEvents(events) {
-    this._events = events;
+class Element extends Component {
+  page = null;
+  _id = "";
+  className = "";
+  textContent = "";
 
-    return this;
-  }
-
-  setId(id) {
-    this._id = id;
-
-    return this;
-  }
-
-  setValue(value) {
-    this.getElement().value = value;
-  }
-
-  stop() {
-    for (let event in this._events) {
-      if (!Array.isArray(this._events[event])) {
-        this._events[event] = [this._events[event]];
-      }
-
-      this._events[event].forEach((callback) => {
-        this.removeEventListener(event, callback);
-      });
-    }
-
-    this._children.forEach((child) => {
-      child.stop();
-    });
-
-    this._children = [];
-
-    this._events = {};
+  create(tagName) {
+    return `
+      <${tagName} 
+        id="${this._id}" 
+        class="${this.className}"
+      >
+        ${this.textContent}
+      </${tagName}>
+    `;
   }
 
   start() {
-    for (let event in this._events) {
-      if (!Array.isArray(this._events[event])) {
-        this._events[event] = [this._events[event]];
-      }
+    super.start();
 
-      this._events[event].forEach((callback) => {
-        this.addEventListener(event, callback);
+    for (const event in this._eventListeners) {
+      this._eventListeners[event].forEach((callback) => {
+        document.getElementById(this._id).addEventListener(event, callback);
       });
     }
+  }
 
-    this._children.forEach((child) => {
-      child.start();
-    });
+  stop() {
+    super.stop();
+
+    for (const event in this._eventListeners) {
+      this._eventListeners[event].forEach((callback) => {
+        document.getElementById(this._id).removeEventListener(event, callback);
+      });
+    }
+  }
+
+  textContent(text) {
+    document.getElementById(this._id).textContent = text;
   }
 }
 
-class LoginFormController extends Controller {
+class Button extends Element {
+  _id = "button";
+
   constructor() {
     super();
-    this.usernameInputController = new Controller()
-      .setId(ids.usernameInputId)
-      .setEvents({
-        input: this.onUsernameChange,
-      });
-
-    this.addChild(this.usernameInputController);
   }
 
-  getUsernameInputController() {
-    return this.usernameInputController;
-  }
-
-  onUsernameChange(e) {
-    console.log("username", e.target.value);
+  get html() {
+    return this.create("button");
   }
 }
 
-class LoginPageController extends Controller {
+class DropdownButton extends Button {
+  _id = "dropdown-button";
+}
+
+class Dropdown extends Element {
+  _id = "dropdown";
+
   constructor() {
     super();
-    this._loginFormController = new LoginFormController().setId(ids.formId);
-    this._removeButtonController = new Controller()
-      .setId(ids.removeButtonId)
-      .setEvents({
-        click: this.onRemoveClick,
-      });
 
-    this.addChild(this._removeButtonController);
-    this.addChild(this._loginFormController);
+    this.button = new DropdownButton();
   }
 
-  getLoginFormController() {
-    return this._loginFormController;
+  get html() {
+    return `
+      <div class="dropdown">
+        ${this.add(this.button)}
+        <div class="dropdown-content"></div>
+      </div>
+    `;
   }
 
-  onRemoveClick = () => {
-    this.stop();
+  start() {
+    this.button.on("click", this.open);
+  }
+
+  open = () => {
+    console.log("open dropdown");
   };
-
-  onFormSubmit(e) {
-    e.preventDefault();
-
-    const username = e.target.username.value;
-    const password = e.target.password.value;
-
-    console.log("username", username);
-    console.log("password", password);
-  }
 }
 
-class AppController extends Controller {
+class Page extends Component {
+  script = "";
+  startFunction = "";
+
   constructor() {
     super();
-    this._loginPageController = new LoginPageController();
-    this.addChild(this._loginPageController);
   }
 
-  getLoginPageController() {
-    return this._loginPageController;
+  addChild(child) {
+    this.script += child.constructor;
+
+    child.page = this;
+
+    return this.addChild(child);
+  }
+
+  get DOCTYPE() {
+    return "<!DOCTYPE html>";
+  }
+
+  get title() {
+    return "Page";
+  }
+
+  get styles() {
+    return `
+      <style></style>
+    `;
+  }
+
+  get head() {
+    return `
+      <head>
+        <title>${this.title}</title>
+        ${this.styles}
+      </head>
+    `;
+  }
+
+  scriptTag(inner) {
+    return `
+      <script defer>
+        ${inner}
+        (${this.startFunction})(${this.constructor})
+      <\/script>
+    `;
+  }
+
+  bodyTag(inner) {
+    return `
+      <body>
+        ${inner}
+      </body>
+    `;
+  }
+
+  get body() {
+    return `
+      <h1>Page</h1>
+    `;
+  }
+
+  get html() {
+    return `
+      ${this.DOCTYPE}
+      <html>
+        ${this.head}
+        ${this.bodyTag(this.body)}
+        ${this.scriptTag(this.script)}
+      </html>
+    `;
   }
 }
 
-const appController = new AppController();
+class HomePage extends Page {
+  script = Component + Page + HomePage + Button + DropdownButton;
 
-appController.start();
+  constructor() {
+    super();
+    this.dropdown = new Dropdown();
+  }
 
-const input = appController
-  .getLoginPageController()
-  .getLoginFormController()
-  .getUsernameInputController();
+  get body() {
+    return `
+      <h1>Home Page</h1>
+      ${this.add(this.dropdown)}
+    `;
+  }
 
-setTimeout(() => {
-  input.setValue("333");
-}, 2000);
+  start() {
+    this.addChild(this.dropdown);
+
+    super.start();
+  }
+}
+
+const page = new HomePage();
+
+page.startFunction = function (page) {
+  const p = new page();
+
+  p.start();
+};
+
+document.open();
+document.write(page.html);
+document.close();
